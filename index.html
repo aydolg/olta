@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Karadeniz Av Rehberi</title>
+<style>
+  /* GENEL STİLLER VE KARTLAR */
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  body,html{height:100%;background:#0c1e36;color:#fff;font-family:system-ui,sans-serif;overflow:hidden}
+ 
+  /* HEADER SADELEŞTİRİLDİ */
+  .header{background:#00ff9d;color:#000;padding:16px;font-weight:900;text-align:center;position:fixed;top:0;left:0;right:0;z-index:1000;box-shadow:0 4px 4px rgba(0,255,157,.4)}
+ 
+  #map{height:35vh; width:100%;position: relative; top: 52px;}
+  .content{position:absolute;top:calc(35vh + 52px); left:0; right:0; bottom:0; overflow-y:auto;-webkit-overflow-scrolling:touch;background:#0c1e36}
+  .card{background:rgba(255,255,255,.08);backdrop-filter:blur(16px);border-radius:20px 20px 0 0;margin:0;padding:20px 16px 30px;box-shadow:0 -10px 40px rgba(0,0,0,.7)}
+  .konum{font-size:24px;color:#00ff9d;font-weight:900;margin-bottom:8px;text-shadow:0 0 12px #00ff9d}
+ 
+  /* TARİH SEÇİCİ */
+  input[type=date]{width:270px;padding:14px 20px;font-size:19px;border:none;border-radius:16px;background:#16213e;color:#fff;box-shadow:0 6px 25px #0008;display:block;margin:10px auto 16px auto;}
+  /* SOLUNAR KARTI */
+  .solunar{background:#16213e;padding:20px;border-radius:18px;margin:18px 0}
+  .solunar h3{font-size:20px;color:#00ff9d;font-weight:900;text-align:center;margin-bottom:16px}
+ 
+  /* GRAFİK VE 24 SAATLİK BÖLÜMÜ */
+  .grafik-konteyner{
+    border: 1px solid rgba(255, 255, 255, 0.1);border-radius: 12px;background: #0b1a2e;margin-bottom: 20px;
+    display: flex; flex-direction: column;
+  }
+  .grafik{height:60px;position:relative;overflow:hidden;padding:10px 0; display:flex; justify-content: space-around;}
+ 
+  /* EMOJİ KONTEYNERİ */
+  .emoji-container{flex-basis: calc(100% / 24); text-align:center;font-size:14px;opacity:0.9;text-shadow: 0 0 5px rgba(0,0,0,0.5);line-height: 40px; height: 40px;margin: 0;padding: 0;border-right: 1px solid rgba(255, 255, 255, 0.2);}
+  .emoji-container:last-child {border-right: none;}
+  /* 24 SAATLİK DİLİMLER ve ETİKETLER */
+  .saatlik-grid{display:grid;grid-template-columns:repeat(24,1fr); gap:0px; height:25px;text-align:center;background:rgba(255,255,255,0.05);border-top: 1px solid rgba(255, 255, 255, 0.1);border-radius: 0 0 12px 12px;}
+  .saat-etiket-sutun{font-size:9px; line-height:25px;opacity:0.8;border-right: 1px solid rgba(255, 255, 255, 0.2);}
+  .saat-etiket-sutun:last-child {border-right: none;}
+  /* ORTALAMA PUAN KUTUSU */
+  .ortalama-puan-kutu {background: rgba(0,255,157,0.1);border-radius: 12px;padding: 15px;text-align: center;margin-bottom: 15px;border: 1px solid #00ff9d;}
+  .ortalama-puan-kutu strong {display: block;font-size: 36px;color: #00ff9d;font-weight: 900;}
+  .ortalama-puan-kutu span {font-size: 14px;opacity: 0.8;}
+  /* BİLGİ KARTLARI */
+  .karti{padding:18px;border-radius:18px;margin:18px 0;background:linear-gradient(135deg,#1e3c72,#2a5298)}
+  .karti.deniz{background:linear-gradient(135deg,#0f2027,#203a43)}
+  .karti.solunar-zaman{background:linear-gradient(135deg,#4e3c72,#5a5298)}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;text-align:center}
+  .item{background:rgba(255,255,255,.12);padding:14px;border-radius:14px}
+  .item strong{font-size:21px;display:block}
+ 
+  /* BALIK TEKNİKLERİ VE PUAN RENKLERİ */
+  .balik-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:30px 0}
+  .balik{background:#16213e;padding:16px;border-radius:16px;text-align:center;cursor:pointer;transition:.3s;border:1px solid rgba(0,255,157,.15)}
+  .balik:hover{transform:scale(1.1);background:#1e2d4a;box-shadow:0 10px 30px rgba(0,255,157,.4)}
+  .balik h3{margin:0 0 6px;font-size:16px;color:#00ff9d}
+  .durum{font-size:15px;font-weight:900}
+ 
+  /* YENİ PUAN RENKLERİ (UX İyileştirmesi) */
+  .cok-yuksek{color:#ff2600} /* Kırmızı */
+  .yuksek{color:#00ff9d} /* Yeşil */
+  .orta{color:#ffc107} /* Sarı */
+  .düşük{color:#b3b3b3} /* Gri/Açık Kırmızı (Düşük aktivite) */
+  .teknik{display:none;background:#0a1e33;padding:30px;border-radius:24px;margin:30px 0;border:3px solid #00ff9d66;line-height:2.2;font-size:17px; text-align:left;}
+  .teknik.active{display:block}
+  .teknik .baslik{font-size:28px;color:#00ff9d;font-weight:900;display:block;margin-bottom:20px;text-align:center;}
+  .teknik strong {color: #00ff9d; display: block; margin-top: 10px;}
+  .teknik li {margin-left: 25px; list-style-type: disc;}
+  .teknik ul{margin-bottom: 10px;}
+  /* YÜKLENİYOR (LOADING) */
+  .loading .card{opacity:0.5;pointer-events:none;}
+</style>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+</head>
+<body>
+<div class="header">Karadeniz Av Rehberi 🐟</div>
+<div id="map"></div>
+<div class="content">
+  <div class="card" id="info">
+    <div style="text-align:center; padding:100px 0; font-size:24px; color:#00ff9d;">Veriler Yükleniyor... ⏳</div>
+  </div>
+</div>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+// Tüm uygulama mantığı IIFE (Immediately Invoked Function Expression) içine alınmıştır.
+(function() {
+    // Sabitler
+    const API_KEY = "7962e151221e801e732120e3f1288ae5"; // Lütfen kendi API anahtarınızı buraya giriniz!
+    const BARTIN = [41.634, 32.335];
+    // Uygulama Değişkenleri
+    let lat = BARTIN[0];
+    let lon = BARTIN[1];
+    let tarih = new Date();
+    let map, marker, debouncedGuncelle;
+   
+    // IDEAL KOŞULLAR
+    const IDEAL_KOŞULLAR = {
+        // Balık Türleri - [Sıcaklık], [Basınç], [Rüzgar], [Dalga] Aralığı ve Ağırlıkları (weightT/P/W/H)
+        "Lüfer": { temp: [14, 22], weightT: 1.5, pressure: [1010, 1025], weightP: 1.3, windSpeed: [5, 15], weightW: 1.0, waveHeight: [0.4, 1.2], weightH: 0.8 },
+        "Levrek": { temp: [10, 18], weightT: 1.6, pressure: [1005, 1018], weightP: 1.0, windSpeed: [4, 12], weightW: 1.2, waveHeight: [0.3, 0.8], weightH: 1.8 },
+        "İstavrit": { temp: [18, 26], weightT: 1.8, pressure: [1015, 1030], weightP: 1.4, windSpeed: [0, 8], weightW: 1.0, waveHeight: [0.0, 0.3], weightH: 1.0 },
+        "Mezgit": { temp: [4, 12], weightT: 1.7, pressure: [1010, 1025], weightP: 0.8, windSpeed: [5, 15], weightW: 1.0, waveHeight: [0.5, 1.5], weightH: 0.9 },
+        "Kalkan": { temp: [8, 16], weightT: 1.2, pressure: [1008, 1020], weightP: 1.0, windSpeed: [7, 18], weightW: 1.3, waveHeight: [0.6, 1.8], weightH: 1.5 },
+        "Zargana": { temp: [16, 24], weightT: 1.4, pressure: [1010, 1022], weightP: 1.0, windSpeed: [3, 10], weightW: 0.9, waveHeight: [0.2, 0.7], weightH: 1.1 },
+        "Sarıkanat": { temp: [14, 22], weightT: 1.5, pressure: [1010, 1025], weightP: 1.3, windSpeed: [5, 15], weightW: 1.0, waveHeight: [0.4, 1.2], weightH: 0.8 },
+        "Kefal": { temp: [18, 28], weightT: 1.5, pressure: [1015, 1030], weightP: 1.8, windSpeed: [0, 5], weightW: 1.7, waveHeight: [0.0, 0.2], weightH: 1.9 },
+        "Barbun": { temp: [15, 22], weightT: 1.3, pressure: [1008, 1020], weightP: 1.2, windSpeed: [3, 10], weightW: 1.0, waveHeight: [0.4, 1.0], weightH: 1.1 },
+        "İzmarit": { temp: [12, 20], weightT: 1.4, pressure: [1010, 1025], weightP: 1.3, windSpeed: [0, 8], weightW: 1.0, waveHeight: [0.1, 0.5], weightH: 0.9 },
+        "Sargoz": { temp: [16, 24], weightT: 1.5, pressure: [1005, 1018], weightP: 1.1, windSpeed: [5, 15], weightW: 1.2, waveHeight: [0.5, 1.5], weightH: 1.4 },
+        "Kırlangıç": { temp: [8, 16], weightT: 1.6, pressure: [1010, 1025], weightP: 1.0, windSpeed: [5, 15], weightW: 1.1, waveHeight: [0.5, 1.5], weightH: 1.3 },
+    };
+    // Balık Av Teknikleri (Detaylı Ekipman Bilgisi Eklendi)
+    const teknikler={
+        "Lüfer":`
+            <span class="baslik">LÜFER – SPIN (AT-ÇEK) AV TEKNİKLERİ</span>
+            <strong>Ekipman Önerileri:</strong>
+            <ul><li>**Kamış:** 270-300 cm, 15-45 gr atarlı (MH aksiyon).</li>
+            <li>**Makine:** 3000-4000 boy (Hızlı devir, 90+ cm sarım).</li>
+            <li>**Misina:** 0.12-0.16 mm 8X İp Misina + **0.30-0.35 mm Florokarbon Lider**.</li></ul>
+            <strong>Yem ve Aksiyon:</strong>
+            <ul><li>**Sahte Yem:** 9-14 cm Minnow (Suspending/Floating), Popper, Kaşık.</li>
+            <li>**Yemli:** Mantarlı dip takımı, Zoka. Taze Zargana/İstavrit filetosu.</li>
+            <li>**Aksiyon:** Kamış ucu aşağıda, hızlı sarım arasına ani duraksamalar (Stop and Go).</li></ul>
+        `,
+        "Levrek":`
+            <span class="baslik">LEVREK – SPIN VE LRF TEKNİKLERİ</span>
+            <strong>Spin (At-Çek) Ekipmanı:</strong>
+            <ul><li>**Kamış:** 240-270 cm, 7-35 gr atarlı (ML/M aksiyon).</li>
+            <li>**Misina:** 0.10-0.14 mm İp + **0.25-0.30 mm FC Lider**.</li>
+            <li>**Yem:** 11-13 cm Suspending/Floating Minnow (bulanık suda Sinking), Yüzey Sahtesi (Popper/Walker).</li></ul>
+            <strong>LRF (Hafif Avcılık) Ekipmanı:</strong>
+            <ul><li>**Kamış:** 180-225 cm, 1-10 gr atarlı.</li>
+            <li>**Makine:** 1000-2000 boy.</li>
+            <li>**Yem:** 3-7 cm küçük Shad silikon, Solucan silikon.</li></ul>
+        `,
+        "İstavrit":`
+            <span class="baslik">İSTAVRİT – ÇAPARİ VE HAFİF JIGGING</span>
+            <strong>Çapari Takımı:</strong>
+            <ul><li>**Kamış:** 330-420 cm Surf Kamış (Kıyıdan atış için) veya Tekne Kamışı.</li>
+            <li>**Takım:** **10-25 köstekli İstavrit Çaparisi**. Köstekler 0.25-0.30 mm.</li>
+            <li>**İğne:** 6-10 numara, kalaylı veya sinek iğne. Tüylerde simli/parlak renkler (Sarı/Beyaz/Yeşil).</li>
+            <li>**Kurşun:** Kıyıdan 150-250 gr, tekneden 60-120 gr armut/yaprak kurşun (Akıntıya göre ayarlanır).</li></ul>
+        `,
+        "Mezgit":`
+            <span class="baslik">MEZGİT – KIŞ DİP AV TEKNİKLERİ</span>
+            <strong>Sistem ve Takım:</strong>
+            <ul><li>**Takım:** Paternoster (uzun köstekli) veya klasik iki köstekli dip takımı.</li>
+            <li>**Köstek:** 0.25-0.30 mm kalınlık, 40-60 cm uzunluk.</li>
+            <li>**İğne:** 4-6 numara uzun pala iğneler.</li>
+            <li>**Yem:** **Boru Kurdu** (Sülünez), Karides, Taze Midye İçi.</li>
+            <li>**Konum:** Soğuk suda kıyıya yakın, kumlu-çamurlu dipler.</li></ul>
+        `,
+        "Kalkan":`
+            <span class="baslik">KALKAN – DİP AV TEKNİKLERİ (Kumlu Dip)</span>
+            <strong>Ekipman Seçimi:</strong>
+            <ul><li>**Kamış:** 100-200 gr atarlı Surf/Tekne kamışı (Güçlü).</li>
+            <li>**Misina:** Beden 0.50-0.70 mm, Köstek **0.35-0.40 mm**.</li>
+            <li>**İğne:** 1/0 - 3/0 arası sağlam iğneler.</li>
+            <li>**Kurşun:** 150-250 gr **Piramit Kurşun** (Kumda gömülüp sabit durması için).</li>
+            <li>**Yem:** Taze ve canlı **İstavrit Filetosu**, Hamsi veya küçük kefal.</li></ul>
+        `,
+        "Zargana":`
+            <span class="baslik">ZARGANA – YÜZEY VE İPEK TEKNİĞİ</span>
+            <strong>Yöntemler ve Ekipman:</strong>
+            <ul><li>**Şamandıralı Yemli:** Gezer şamandıralı, hafif tek iğneli takım. Yem olarak **İstavrit/Hamsi şerit yem**.</li>
+            <li>**İpek Avı:** İğnesiz, turuncu/sarı renkli ipek takımı (Raglou tarzı). At-çek aksiyonu ile ipeğe sarılması sağlanır.</li>
+            <li>**Spin:** 5-6 cm beyaz simli silikonlar veya ufak kaşıklar.</li>
+            <li>**Kritik:** Yemi takip ediyorsa sarım hızını değiştirerek ani duraksamalar yapın.</li></ul>
+        `,
+        "Sarıkanat":`
+            <span class="baslik">SARIKANAT – SPIN (AT-ÇEK) TEKNİĞİ</span>
+            <strong>Ekipman Odak:</strong>
+            <ul><li>**Kamış:** 240-270 cm, 7-35 gr atarlı, hassas uçlu Spin kamışı.</li>
+            <li>**Misina:** 0.10-0.12 mm İp misina (İnce takım avcılığı artırır).</li>
+            <li>**Yem:** **7-10 cm Sinking/Suspending Minnow** veya küçük Jig (10-25 gr).</li>
+            <li>**Aksiyon:** Hızlı ve agresif sarım. Özellikle akarsu ağızları ve dalgalı sular hedeflenmeli.</li></ul>
+        `,
+        "Kefal":`
+            <span class="baslik">KEFAL – ŞAMANDIRA VE SARMA TEKNİKLERİ</span>
+            <strong>Ekipman ve Takım:</strong>
+            <ul><li>**Kamış/Makine:** Hafif ve esnek, ince takımlar tercih edin.</li>
+            <li>**Takım:** Gezer şamandıralı tek iğneli takım veya Sarma olta (çok iğneli).</li>
+            <li>**Misina:** 0.15-0.20 mm (Kefal kurnaz ve narin dudaklıdır).</li>
+            <li>**Yem:** **Ekmek İçi/Hamur**, Tavuk Eti, Kurtçuk (Solucan), Midye İçi.</li>
+            <li>**Teknik:** Yemi didiklediği için yutana kadar tasmalamayı bekleyin.</li></ul>
+        `,
+        "Barbun":`
+            <span class="baslik">BARBUN – DİP (MOMENTO) AV TEKNİKLERİ</span>
+            <strong>Ekipman ve Yem:</strong>
+            <ul><li>**Takım:** İki/Üç köstekli yemli dip takımı.</li>
+            <li>**Misina:** Ana Beden 0.30-0.35 mm, Köstek **0.20-0.28 mm Mono Misina**.</li>
+            <li>**İğne:** 7-9 numara **Çapraz/Kırmızı** renkli iğneler (Dipte dikkat çekmesi için).</li>
+            <li>**Kurşun:** 75-120 gr (Akıntıya göre).</li>
+            <li>**Yem:** Taze **Karides** (Çimçim), Boru Kurdu, Sülünez, Tavuk Göğsü.</li></ul>
+        `,
+        "İzmarit":`
+            <span class="baslik">İZMİRİT – KIYI SAVURMA (DİP)</span>
+            <strong>Ekipman ve Takım:</strong>
+            <ul><li>**Takım:** Üç köstekli dip takımı (Kıyıdan savurma için köstek boyları uzun olmalı).</li>
+            <li>**Misina:** Beden 0.35 mm, Köstek **0.18-0.20 mm** (İnce takım çok avcıdır).</li>
+            <li>**İğne:** 9-14 numara sinek iğneler.</li>
+            <li>**Yem:** **Midye İçi**, Teke, Mamun, Balık Eti (göğüs kısmı).</li>
+            <li>**Kritik:** Güneş battıktan sonra av kesilir. Sabah saatleri verimlidir.</li></ul>
+        `,
+        "Sargoz":`
+            <span class="baslik">SARGOZ – KAYALIK DİP VE LRF</span>
+            <strong>Takım ve Yemler:</strong>
+            <ul><li>**Takım:** Yemli dip takımı (Taşlık ve kayalık merada takılma riski yüksek).</li>
+            <li>**Misina:** **0.25-0.30 mm** (Kayalara sürtünmeye dayanıklı olmalı).</li>
+            <li>**Yem:** **Mamun, Sülünez, Canlı Teke, Midye**. (Sert yemler: Kalamar, Sübye).</li>
+            <li>**LRF:** 5-10 gr jighead ve deniz hıyarı veya kurtçuk imitasyonu silikon.</li>
+            <li>**Hedef:** Taşlık ve meraların dibi, liman içleri.</li></ul>
+        `,
+        "Kırlangıç":`
+            <span class="baslik">KIRLANGIÇ – DERİN DİP AV (TEKNE)</span>
+            <strong>Ekipman Odak:</strong>
+            <ul><li>**Yöntem:** Tekne avcılığı (Bırakma/Şakşak).</li>
+            <li>**Kamış:** Güçlü, 150-300 gr atarlı teknede kullanılan kısa kamışlar.</li>
+            <li>**Kurşun:** 150-300 gr ağırlığında.</li>
+            <li>**Misina/Köstek:** 0.35-0.45 mm arası sağlam misina.</li>
+            <li>**Yem:** **Kalamar parçası**, Taze Karides veya Taze Hamsi/İstavrit filetosu.</li></ul>
+        `,
+    };
+    // Yardımcı Fonksiyonlar (Önceki Koddan)
+    const debounce = (func, delay) => {
+        let timeoutId;
+        return (...args) => {
+            if (timeoutId) {clearTimeout(timeoutId);}
+            timeoutId = setTimeout(() => {func.apply(null, args);}, delay);
+        };
+    };
+    const yon = d => ["K", "KB", "B", "GB", "G", "GD", "D", "KD"][Math.round(d / 45) % 8];
+    const formatSolunarTime = h => {
+        const hours = Math.floor(h);
+        const minutes = Math.round((h - hours) * 60);
+        return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+    };
+    const solunar = t => {
+        const g = (t - new Date("2000-01-06")) / 864e5;
+        const m = (218.316 + 13.176396 * g) % 360;
+        const s = (280.466 + 0.9856474 * ((t - new Date("2000-01-01")) / 864e5)) % 360;
+        let f = (m - s + 360) % 360;
+        if (f > 180) f -= 360;
+        const maj1 = ((f / 15) + 2 + 24) % 24; const maj2 = (maj1 + 12) % 24;
+        const min1 = (maj1 + 6) % 24; const min2 = (maj1 + 18) % 24;
+        return { maj1, maj2, min1, min2, ay: Math.round((f + 180) / 3.6) };
+    };
+    const gelgit = t => {
+        const h = t.getTime() / 36e5;
+        const cm = Math.round(Math.sin(h * .52) * 18 + Math.cos(h * .38) * 8 + 32);
+        return { seviye: (cm / 100).toFixed(2), trend: Math.cos(h * .52) > 0 ? "Yükseliyor" : "Düşüyor" };
+    };
+    const getFishEmojis = (hour, m1, m2, n1, n2, returnWeight = false) => {
+        let count = 0;
+        if (Math.abs(hour - m1) < 1.5 || Math.abs(hour - m2) < 1.5) {count = 3;}
+        else if (Math.abs(hour - n1) < 1 || Math.abs(hour - n2) < 1) {count = 2;}
+        else if (Math.abs(hour - n1) < 2 || Math.abs(hour - n2) < 2) {count = 1;}
+        if (returnWeight) return count;
+        if (count === 3) return "🐟🐟🐟";
+        if (count === 2) return "🐟🐟";
+        if (count === 1) return "🐟";
+        return "";
+    };
+    const calculateFactorMultiplier = (current, ideal) => {
+        const [min, max] = ideal;
+        if (current >= min && current <= max) {return 1.2;}
+        const midpoint = (min + max) / 2;
+        const range = (max - min) / 2;
+        const distance = Math.abs(current - midpoint);
+        const max_deviation = range * 3;
+        const penalty = Math.min(1, distance / max_deviation) * 0.7;
+        return 1.2 - penalty;
+    };
+    const getFinalMultiplier = (fishName, temp, pressure, windSpeed, waveHeight) => {
+        const ideal = IDEAL_KOŞULLAR[fishName];
+        if (!ideal) return 1.0;
+        let totalMultiplier = 0;
+        let totalWeight = 0;
+        const factors = [
+            { current: temp, ideal: ideal.temp, weight: ideal.weightT },
+            { current: pressure, ideal: ideal.pressure, weight: ideal.weightP },
+            { current: windSpeed, ideal: ideal.windSpeed, weight: ideal.weightW },
+            { current: waveHeight, ideal: ideal.waveHeight, weight: ideal.weightH }
+        ];
+        factors.forEach(f => {
+            const factorM = calculateFactorMultiplier(f.current, f.ideal);
+            totalMultiplier += factorM * f.weight;
+            totalWeight += f.weight;
+        });
+       
+        return totalMultiplier / totalWeight;
+    };
+    const getSolunarBaseScore = (m1, m2, n1, n2) => {
+        let totalWeight = 0;
+        for (let i = 0; i < 24; i++) {
+            totalWeight += getFishEmojis(i + 0.5, m1, m2, n1, n2, true);
+        }
+        const averageScore = (totalWeight / 72) * 100;
+        return Math.min(100, Math.round(averageScore));
+    };
+    const getScoreStatus = (score) => {
+        let status = "", className = "";
+        if (score > 80) {status = "ÇOK YÜKSEK"; className = "cok-yuksek";}
+        else if (score > 60) {status = "YÜKSEK"; className = "yuksek";}
+        else if (score > 35) {status = "ORTA"; className = "orta";}
+        else {status = "DÜŞÜK"; className = "düşük";}
+        return { status, className };
+    };
+    const grafik = (m1, m2, n1, n2) => {
+        let h = `<div class="grafik-konteyner"><div class="grafik">`;
+        for (let i = 0; i < 24; i++) {
+            const emoji = getFishEmojis(i + 0.5, m1, m2, n1, n2);
+            h += `<div class="emoji-container">${emoji}</div>`;
+        }
+        h += `</div><div class="saatlik-grid">`;
+        for (let i = 0; i < 24; i++) {
+            const etiket = i.toString().padStart(2, "0");
+            h += `<div class="saat-etiket-sutun">${etiket}</div>`;
+        }
+        h += `</div></div>`;
+        return h;
+    };
+    // Balık Kartlarını Oluşturma Fonksiyonu
+    const renderFishCards = (teknikler, solunarTabanPuan, suSicakligi, basinc, ruzgarHizi, dalgaBoyu) => {
+        let baliklarHTML = '';
+        let overallScoreSum = 0;
+        let fishCount = 0;
+        // IDEAL_KOŞULLAR'da tanımlı olan türler puanlamaya dahil edilir.
+        const puanlananTurler = Object.keys(IDEAL_KOŞULLAR);
+        puanlananTurler.forEach(b => {
+            const cevreselCarpan = getFinalMultiplier(b, suSicakligi, basinc, ruzgarHizi, dalgaBoyu);
+            let nihaiPuan = Math.round(solunarTabanPuan * cevreselCarpan);
+            nihaiPuan = Math.max(0, Math.min(100, nihaiPuan));
+           
+            const { status, className } = getScoreStatus(nihaiPuan);
+            baliklarHTML += `<div class="balik" onclick="window.app.acTeknik('${b}')">
+                                <h3>${b}</h3>
+                                <div class="durum $$ {className}"> $${status} (${nihaiPuan}%)</div>
+                            </div>`;
+           
+            overallScoreSum += nihaiPuan;
+            fishCount++;
+        });
+       
+        const genelAvPuan = fishCount > 0 ? Math.round(overallScoreSum / fishCount) : solunarTabanPuan;
+        return { baliklarHTML, genelAvPuan };
+    };
+    // Ana Güncelleme Fonksiyonu
+    async function guncelle(l = lat, n = lon) {
+        document.body.classList.add("loading");
+       
+        const today = new Date();
+        const isoDate = today.toISOString().split('T')[0];
+       
+        const tarihInput = document.getElementById("tarihInput");
+        const iso = tarihInput && tarihInput.value ? tarihInput.value : isoDate;
+        tarih = new Date(iso);
+        // YÜKLEME VE TARİH BİLGİSİ
+        document.getElementById("info").innerHTML = `
+            <div class="konum">📍 Konum Yükleniyor...</div>
+            <input type="date" id="tarihInput" value="${iso}" onchange="window.app.tarihInputChanged(this.value)">
+            <div style="text-align:center; padding:50px 0; font-size:24px; color:#00ff9d;">Veriler Yükleniyor... ⏳</div>
+        `;
+        lat = l; lon = n;
+        marker.setLatLng([l, n]);
+        map.setView([l, n], 13);
+        try {
+            // API CALLS
+            const [yerRes, havaRes, denizRes, gunRes] = await Promise.all([
+                fetch(`https://nominatim.openstreetmap.org/reverse?lat=${l}&lon=${n}&format=json`).then(r => r.json()),
+                fetch(`https://api.openweathermap.org/data/2.5/forecast?lat=${l}&lon=${n}&appid=${API_KEY}&units=metric&lang=tr`).then(r => r.json()),
+                fetch(`https://marine-api.open-meteo.com/v1/marine?latitude=${l}&longitude=${n}&hourly=wave_height,sea_surface_temperature&timezone=Europe%2FIstanbul&start_date=${iso}&end_date=${iso}`).then(r => r.json()),
+                fetch(`https://api.sunrise-sunset.org/json?lat=${l}&lng=${n}&date=${iso}&formatted=0`).then(r => r.json())
+            ]);
+            // Veri İşleme
+            const yerAdi = yerRes.address.city || yerRes.address.town || yerRes.address.village || yerRes.display_name.split(",")[0];
+           
+            const targetHour = new Date(iso).setHours(12);
+            const gun = havaRes.list.reduce((prev, curr) => {
+                const timeDiffPrev = Math.abs(new Date(prev.dt_txt).getTime() - targetHour);
+                const timeDiffCurr = Math.abs(new Date(curr.dt_txt).getTime() - targetHour);
+                return (timeDiffCurr < timeDiffPrev) ? curr : prev;
+            });
+            const suSicakligi = parseFloat(denizRes.hourly?.sea_surface_temperature?.[12]?.toFixed(1) ?? "15.0");
+            const dalgaBoyu = parseFloat(denizRes.hourly?.wave_height?.[12]?.toFixed(1) ?? "0.5");
+            const basinc = gun.main.pressure;
+            const ruzgarHizi = gun.wind.speed;
+           
+            const gunDogus = new Date(gunRes.results.sunrise).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
+            const gunBatis = new Date(gunRes.results.sunset).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
+            const { maj1, maj2, min1, min2, ay } = solunar(tarih);
+            const { seviye, trend } = gelgit(tarih);
+           
+            const majorSaatler = `${formatSolunarTime(maj1)} & ${formatSolunarTime(maj2)}`;
+            const minorSaatler = `${formatSolunarTime(min1)} & ${formatSolunarTime(min2)}`;
+            const solunarTabanPuan = getSolunarBaseScore(maj1, maj2, min1, min2);
+            // Balık Türlerine Özel Puanlama
+            const { baliklarHTML, genelAvPuan } = renderFishCards(teknikler, solunarTabanPuan, suSicakligi, basinc, ruzgarHizi, dalgaBoyu);
+            const genelStatus = getScoreStatus(genelAvPuan);
+           
+            // HTML Çıktısı
+            document.getElementById("info").innerHTML = `
+                <div class="konum">📍 ${yerAdi}</div>
+                <input type="date" id="tarihInput" value="${iso}" onchange="window.app.tarihInputChanged(this.value)">
+                <div class="solunar">
+                    <h3>SOLUNAR AKTİVİTE TABLOSU (24 Saat)</h3>
+                    ${grafik(maj1, maj2, min1, min2)}
+                </div>
+                <div class="ortalama-puan-kutu">
+                    <span>SEÇİLEN GÜNÜN TAHMİNİ GENEL AV PUANI (${Object.keys(IDEAL_KOŞULLAR).length} Tür Ortalaması)</span>
+                    <strong>$$ {genelAvPuan}% ( $${genelStatus.status})</strong>
+                </div>
+               
+                <div class="karti solunar-zaman">
+                    <div style="font-size:18px; color:#00ff9d; font-weight:900; margin-bottom:10px; text-align:center;">KRİTİK AVLANMA ZAMANLARI (Yerel Saat)</div>
+                    <div class="grid">
+                        <div class="item"><strong>${majorSaatler}</strong><br>Major Dönemler (En Yüksek)</div>
+                        <div class="item"><strong>${minorSaatler}</strong><br>Minor Dönemler (Yüksek)</div>
+                    </div>
+                </div>
+                <div class="karti"><div class="grid">
+                    <div class="item"><strong>${Math.round(gun.main.temp)}°C</strong><br>Hava Sıcaklığı</div>
+                    <div class="item"><strong>${basinc} hPa</strong><br>Basınç</div>
+                    <div class="item"><strong>${yon(gun.wind.deg)} ${ruzgarHizi.toFixed(1)} m/s</strong><br>Rüzgar</div>
+                    <div class="item"><strong>${gun.weather[0].description.charAt(0).toUpperCase() + gun.weather[0].description.slice(1)}</strong><br>Hava</div>
+                </div></div>
+                <div class="karti deniz"><div class="grid">
+                    <div class="item"><strong>${suSicakligi}°C</strong><br>Su Sıcaklığı</div>
+                    <div class="item"><strong>${dalgaBoyu} m</strong><br>Dalga</div>
+                    <div class="item"><strong>${gunDogus} / ${gunBatis}</strong><br>Güneş D/B</div>
+                    <div class="item"><strong>${ay}%</strong><br>Ay Doluluk</div>
+                </div></div>
+               
+                <div class="karti"><div class="grid">
+                    <div class="item" style="grid-column: span 2;"><strong>${trend} ${seviye} m</strong><br>Gelgit / Akıntı Durumu (Karadeniz Simülasyonu)</div>
+                </div></div>
+                <div id="teknik" class="teknik"></div>
+                <div style="text-align:center;margin:40px 0 20px;color:#00ff9d;font-size:22px;font-weight:900">🐠 BALIK TÜRÜNE GÖRE AV BAŞARI PUANI (Bölgesel) 🎯</div>
+                <div class="balik-grid">${baliklarHTML}</div>
+            `;
+            document.body.classList.remove("loading");
+        } catch (error) {
+            console.error("KRİTİK HATA: API VERİSİ ÇEKİLEMEDİ! Lütfen API Anahtarınızı kontrol edin.", error);
+           
+            document.getElementById("info").innerHTML = `
+                <div class="konum" style="color:#ff2600;">❌ VERİ HATASI!</div>
+                <input type="date" id="tarihInput" value="${iso}" onchange="window.app.tarihInputChanged(this.value)">
+                <div style="text-align:center; padding:50px 0; color:#ffc107;">
+                    <h2>API Bağlantı Hatası! 🛑</h2>
+                    <p>Veriler yüklenemedi. Lütfen **Geliştirici Konsolunu (F12)** kontrol edin ve **API Anahtarınızın** (OpenWeatherMap) geçerli olduğundan emin olun.</p>
+                </div>
+            `;
+            document.body.classList.remove("loading");
+        }
+    }
+    // Teknik Detay gösterici (Global erişim için)
+    function acTeknik(b) {
+        const el = document.getElementById("teknik");
+        el.innerHTML = teknikler[b];
+        el.classList.add("active");
+        el.scrollIntoView({ behavior: "smooth" });
+    }
+    // Tarih Değişimi Fonksiyonu
+    function tarihInputChanged(dateValue) {
+        tarih = new Date(dateValue);
+        guncelle(lat, lon);
+    }
+    // Uygulama Başlatma Fonksiyonu
+    function init() {
+        // Harita Kurulumu
+        map = L.map('map').setView(BARTIN, 11);
+        marker = L.marker(BARTIN, { draggable: true }).addTo(map);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
+        // Olay Dinleyicileri
+        debouncedGuncelle = debounce(guncelle, 500);
+        marker.on('dragend', (e) => {
+            const coords = e.target.getLatLng();
+            debouncedGuncelle(coords.lat.toFixed(5), coords.lng.toFixed(5));
+        });
+        map.on("click", e => debouncedGuncelle(e.latlng.lat.toFixed(5), e.latlng.lng.toFixed(5)));
+       
+        guncelle(lat, lon); // İlk yükleme
+    }
+   
+    // Global erişim için fonksiyonları window objesine ata
+    window.app = {
+        init: init,
+        acTeknik: acTeknik,
+        tarihInputChanged: tarihInputChanged
+    };
+    window.onload = window.app.init;
+})();
+</script>
+</body>
+</html>
